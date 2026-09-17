@@ -14,6 +14,8 @@ from langgraph.graph.message import add_messages
 
 from schemas import (
     Activity,
+    AgentName,
+    CriticVerdict,
     FlightOption,
     HotelOption,
     Itinerary,
@@ -35,9 +37,10 @@ class WanderState(TypedDict,total=False):
     itinerary: Itinerary
 
     # Composer output and critic control
+    verdict: CriticVerdict
     critic_feedback:str
     revisions:int
 
     # Routing + Human in the loop
-    next_agent:str
+    next_agent:AgentName
     awaiting_confirmation:bool

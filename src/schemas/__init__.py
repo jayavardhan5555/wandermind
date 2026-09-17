@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date
 from tkinter import N
 from pydantic import BaseModel,Field
+from typing import Literal
 
 class LocationMatch(BaseModel):
     name:str
@@ -74,3 +75,40 @@ class Itinerary(BaseModel):
     days:list[ItineraryDay] = Field(default_factory=list)
     budget: BudgetSummary | None = None
     disclaimers:list[str]= Field(default_factory=list)
+
+class AgentName: Literal[
+    "flight",
+    "hotel",
+    "activities",
+    "weather",
+    "budget",
+    "compose",
+    "done"
+]
+
+class RouteDecision(BaseModel):
+    """structured supervisor output : the next hop and on the first turn"""
+
+    next_agent: AgentName
+    request: TripRequest
+    reason: str | None = None
+
+class CriticVerdict(BaseModel):
+    approved: bool
+    score: float | None = Field(default=None,ge=0,le=10)
+    feedback:str | None = None
+
+__all__ =[
+    "LocationMatch",
+    "TripRequest",
+    "FlightOption",
+    "AgentName",
+    "HotelOption",
+    "Activity",
+    "WeatherDay",
+    "BudgetSummary",
+    "ItineraryDay",
+    "Itinerary",
+    "RouteDecision",
+    "CriticVerdict"
+]
