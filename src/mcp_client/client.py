@@ -2,7 +2,7 @@
 
 
 from __future__ import annotations
-from config import get_settings, Settings
+from src.config import get_settings, Settings
 
 async def load_tools() -> list:
     """Load MCP tools as LangChainTools for the agents"""

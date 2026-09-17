@@ -5,9 +5,9 @@ from typing import Annotated,Literal
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
-from config import get_settings, Settings
+from src.config import get_settings, Settings
 
-from mcp_server import ToolError, providers
+from src.mcp_server import ToolError, providers
 
 mcp = FastMCP("wandermind-travel")
 

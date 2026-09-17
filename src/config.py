@@ -22,8 +22,9 @@ class Settings(BaseSettings):
     groq_api_key:str = Field(default="",alias="GROQ_API_KEY")
 
     # -- Travel tool APIs
-    amadeus_client_id:str = Field(default="",alias="AMADEUS_CLIENT_ID")
-    amadeus_client_secret:str = Field(default="",alias="AMADEUS_CLIENT_SECRET")
+   
+    travelpayouts_api_key:str = Field(default="",alias="TRAVELPAYOUTS_API_KEY")
+    travelpayouts_marker:str = Field(default="",alias="TRAVELPAYOUTS_MARKER")
     opentripmap_api_key:str = Field(default="",alias="OPENTRIPMAP_API_KEY")
 
     # --Langfuse

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from config import get_settings
+from src.config import get_settings
 
 def get_callback_handler():
 

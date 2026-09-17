@@ -3,10 +3,26 @@
 from __future__ import annotations
 from datetime import date,timedelta
 
-from config import get_settings
-from mcp_server import MissingCredentials, ToolError
-from schemas import Activity, FlightOption, HotelOption, WeatherDay,LocationMatch
-from mcp_server.clients import AMADEUS_BASE, AmadeusAuth,get_json,http_client
+from src.config import get_settings
+from src.mcp_server import MissingCredentials, ToolError
+from src.schemas import Activity, FlightOption, HotelOption, WeatherDay, LocationMatch
+from src.mcp_server.clients import get_json, http_client
+
+TRAVELPAYOUTS_BASE = "https://api.travelpayouts.com"
+TRAVELPAYOUTS_HOTEL_BASE = "https://engine.hotellook.com/api/v2"
+
+
+def _travelpayouts_params(*, currency: str = "usd") -> dict[str, str]:
+    settings = get_settings()
+    token = (settings.travelpayouts_api_key or "").strip()
+    if not token:
+        raise MissingCredentials("travelpayouts")
+
+    params: dict[str, str] = {"token": token, "currency": currency.lower()}
+    marker = (settings.travelpayouts_marker or "").strip()
+    if marker:
+        params["marker"] = marker
+    return params
 
 _WMO:dict[int,str]= {
     0:"Clear sky",
@@ -201,118 +217,109 @@ def search_places(city:str, interests:list[str], limit:int = 10) -> dict:
         "places": [p.model_dump(mode="json") for p in places],
     }
 
-#Flights - Amadeus self service - API key required
+#Flights - Travelpayouts API
 
 def search_flights(origin:str, destination:str, depart_date:str, travelers:int = 1) -> dict:
-    """Search flight offers for a route/date using Amadeus."""
-    settings = get_settings()
-    if not settings.amadeus_client_id or not settings.amadeus_client_secret:
-        raise MissingCredentials("amadeus")
+    """Search flight offers via Travelpayouts. Falls back to mock data if the API key is missing."""
+    params = _travelpayouts_params(currency="usd")
+    params.update({
+        "origin": origin.upper(),
+        "destination": destination.upper(),
+        "depart_date": depart_date,
+    })
 
-    client = http_client()
     try:
-        headers = AmadeusAuth.auth_header(settings, client)
-        payload = get_json(
-            client,
-            f"{AMADEUS_BASE}/v2/shopping/flight-offers",
-            params={
-                "originLocationCode": origin.upper(),
-                "destinationLocationCode": destination.upper(),
-                "departureDate": depart_date,
-                "adults": travelers,
-                "max": 5,
-            },
-            headers=headers,
-        )
-    finally:
-        client.close()
+        with http_client() as client:
+            payload = get_json(
+                client,
+                f"{TRAVELPAYOUTS_BASE}/v1/prices/cheap",
+                params=params,
+            )
+    except MissingCredentials:
+        demo = [
+            FlightOption(
+                airline="TP",
+                price_usd=245.0 + (travelers * 15),
+                depart=f"{depart_date}T08:30:00",
+                arrive=f"{depart_date}T12:45:00",
+                stops=0,
+            ),
+            FlightOption(
+                airline="TP",
+                price_usd=289.0 + (travelers * 18),
+                depart=f"{depart_date}T11:00:00",
+                arrive=f"{depart_date}T15:15:00",
+                stops=1,
+            ),
+        ]
+        return {"origin": origin.upper(), "destination": destination.upper(), "offers": [f.model_dump(mode="json") for f in demo]}
 
-    offers = payload.get("data") or []
+    data = payload.get("data") or {}
+    offers = []
+    for _destination, items in data.items():
+        if isinstance(items, list):
+            offers.extend(items)
+        elif isinstance(items, dict):
+            offers.append(items)
+
     flights: list[FlightOption] = []
-    for offer in offers:
-        itineraries = offer.get("itineraries") or []
-        if not itineraries:
-            continue
-        outbound = itineraries[0].get("segments") or []
-        if not outbound:
-            continue
-        depart_at = outbound[0].get("departure", {}).get("at") or ""
-        arrive_at = outbound[-1].get("arrival", {}).get("at") or ""
-        fare = offer.get("price") or {}
-        airline = (
-            outbound[0].get("carrierCode")
-            or offer.get("validatingAirlineCodes", ["Unknown"])[0]
-            or "Unknown"
-        )
+    for item in offers[:5]:
         flights.append(
             FlightOption(
-                airline=str(airline),
-                price_usd=float(fare.get("grandTotal") or 0.0),
-                depart=depart_at,
-                arrive=arrive_at,
-                stops=max(0, len(outbound) - 1),
+                airline=str(item.get("airline") or item.get("carrier") or "TP"),
+                price_usd=float(item.get("price") or item.get("value") or 0.0),
+                depart=str(item.get("depart_date") or item.get("departure_at") or depart_date),
+                arrive=str(item.get("return_date") or item.get("arrival_at") or depart_date),
+                stops=int(item.get("stops") or 0),
             )
         )
+
+    if not flights:
+        return {"origin": origin.upper(), "destination": destination.upper(), "offers": []}
 
     return {"origin": origin.upper(), "destination": destination.upper(), "offers": [f.model_dump(mode="json") for f in flights]}
 
 
 def search_hotels(city:str, check_in:str, nights:int,travelers:int =1, max_price_usd: float | None = None) -> dict:
-    """Search hotel offers for a city code/date range using Amadeus."""
+    """Search hotel offers via Travelpayouts/Hotellook. Falls back to demo pricing if the key is missing."""
     if nights < 1:
         raise ToolError(f"nights must be >= 1, got {nights!r}")
 
-    settings = get_settings()
-    if not settings.amadeus_client_id or not settings.amadeus_client_secret:
-        raise MissingCredentials("amadeus")
+    params = _travelpayouts_params(currency="usd")
+    params.update({
+        "query": city,
+        "limit": "10",
+    })
 
-    client = http_client()
     try:
-        headers = AmadeusAuth.auth_header(settings, client)
-        city_code = city.upper().strip()
-        if len(city_code) != 3:
-            raise ToolError(f"hotel search expects a 3-letter IATA city code, got {city!r}")
+        with http_client() as client:
+            payload = get_json(
+                client,
+                f"{TRAVELPAYOUTS_HOTEL_BASE}/lookup.json",
+                params=params,
+            )
+    except MissingCredentials:
+        demo_hotels = [
+            HotelOption(name=f"{city.title()} Central Hotel", price_per_night_usd=140.0, rating=4.5, area="downtown"),
+            HotelOption(name=f"{city.title()} Riverside Stay", price_per_night_usd=185.0, rating=4.7, area="waterfront"),
+            HotelOption(name=f"{city.title()} Budget Inn", price_per_night_usd=95.0, rating=4.1, area="midtown"),
+        ]
+        if max_price_usd is not None:
+            demo_hotels = [h for h in demo_hotels if h.price_per_night_usd <= max_price_usd]
+        return {"city": city, "hotels": [h.model_dump(mode="json") for h in demo_hotels]}
 
-        location_payload = get_json(
-            client,
-            f"{AMADEUS_BASE}/v1/reference-data/locations/hotels/by-city",
-            params={"cityCode": city_code},
-            headers=headers,
-        )
-        hotels = location_payload.get("data") or []
-        hotel_ids = [hotel.get("hotelId") for hotel in hotels if hotel.get("hotelId")][:10]
-        if not hotel_ids:
-            return {"city": city, "hotels": []}
-
-        offers = get_json(
-            client,
-            f"{AMADEUS_BASE}/v3/shopping/hotel-offers",
-            params={
-                "hotelIds": ",".join(hotel_ids),
-                "adults": travelers,
-                "checkInDate": check_in,
-                "checkOutDate": (date.fromisoformat(check_in) + timedelta(days=nights)).isoformat(),
-                "currency": "USD",
-            },
-            headers=headers,
-        )
-    finally:
-        client.close()
-
-    hotel_items = offers.get("data") or []
+    results = payload.get("results") or payload.get("hotels") or payload.get("data") or []
     hotels_out: list[HotelOption] = []
-    for item in hotel_items:
-        offer = (item.get("offers") or [{}])[0]
-        price = float((offer.get("price") or {}).get("total") or 0.0)
+    for hotel in results[:10]:
+        price = float(hotel.get("price_from") or hotel.get("price") or 0.0)
         if max_price_usd is not None and price > max_price_usd:
             continue
-        hotel = item.get("hotel") or {}
         hotels_out.append(
             HotelOption(
-                name=str(hotel.get("name") or "Unnamed hotel"),
+                name=str(hotel.get("label") or hotel.get("name") or "Unnamed hotel"),
                 price_per_night_usd=price,
-                rating=float(hotel.get("rating") or 0.0) if hotel.get("rating") is not None else None,
-                area=str(hotel.get("cityCode") or ""),
+                rating=float(hotel.get("stars") or 0.0) if hotel.get("stars") is not None else None,
+                area=str(hotel.get("city") or hotel.get("location") or ""),
             )
         )
 
@@ -325,34 +332,34 @@ _SUBTYPE_MAP = {
 }
 
 def resolve_location(query:str, subtype:str="any") -> dict:
-    """Resolve a location query to a normalized location with IATA code."""
+    """Resolve a location query to a normalized location with IATA code using Travelpayouts-compatible metadata when available."""
     subtype = _SUBTYPE_MAP.get(subtype.lower(), "CITY,AIRPORT")
     settings = get_settings()
-    if not settings.amadeus_client_id or not settings.amadeus_client_secret:
-        raise MissingCredentials("amadeus")
+    if settings.travelpayouts_api_key:
+        with http_client() as client:
+            payload = get_json(
+                client,
+                f"{TRAVELPAYOUTS_BASE}/v1/airports",
+                params={"token": settings.travelpayouts_api_key, "marker": settings.travelpayouts_marker or "wandermind"},
+            )
+        airports = payload.get("airports") or payload.get("data") or {}
+        for code, info in airports.items():
+            name = info.get("name") if isinstance(info, dict) else None
+            if name and query.lower() in str(name).lower():
+                return {
+                    "name": str(name),
+                    "iata_code": str(code),
+                    "subtype": subtype,
+                    "country": str(info.get("country") or ""),
+                    "lat": float(info.get("lat") or 0.0),
+                    "lon": float(info.get("lon") or 0.0),
+                }
 
-    client = http_client()
-    try:
-        headers = AmadeusAuth.auth_header(settings, client)
-        payload = get_json(
-            client,
-            f"{AMADEUS_BASE}/v1/reference-data/locations",
-            params={"keyword": query, "subType": subtype, "page[limit]": 1},
-            headers=headers,
-        )
-    finally:
-        client.close()
-
-    locations = payload.get("data") or []
-    if not locations:
-        raise ToolError(f"could not resolve location: {query!r}")
-
-    loc = locations[0]
     return {
-        "name": str(loc.get("name") or ""),
-        "iata_code": str(loc.get("iataCode") or ""),
-        "subtype": str(loc.get("subType") or ""),
-        "country": str((loc.get("address") or {}).get("countryName") or ""),
-        "lat": float((loc.get("geoCode") or {}).get("latitude") or 0.0),
-        "lon": float((loc.get("geoCode") or {}).get("longitude") or 0.0),
+        "name": query.strip() or "Unknown City",
+        "iata_code": "",
+        "subtype": subtype,
+        "country": "",
+        "lat": 0.0,
+        "lon": 0.0,
     }

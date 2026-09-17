@@ -3,7 +3,7 @@
 from __future__ import annotations
 from functools import lru_cache
 
-from config import get_settings, Settings
+from src.config import get_settings, Settings
 
 def _model_list(settings:Settings) -> list[dict]:
 
