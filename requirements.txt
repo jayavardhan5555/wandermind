@@ -5,7 +5,7 @@ langchain-openai>=0.2.0
 
 # --- Model Context Protocal ---
 mcp[cli]>=1.26.0
-langchain-mcp-adapter>=0.1.0
+langchain-mcp-adapters>=0.1.0
 
 # --- LLM Gateway ---
 litellm>=1.55.0

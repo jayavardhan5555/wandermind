@@ -1,0 +1,1 @@
+"""MCP server package: exposes travel tools over MCP"""
