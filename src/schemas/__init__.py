@@ -8,6 +8,14 @@ from datetime import date
 from tkinter import N
 from pydantic import BaseModel,Field
 
+class LocationMatch(BaseModel):
+    name:str
+    iata_code:str | None = None
+    subtype:str | None = None
+    country:str | None = None
+    lat:float | None = None
+    lon:float | None = None
+
 class TripRequest(BaseModel):
     """Normalized user request produced by the supervisor after intent parsing"""
 

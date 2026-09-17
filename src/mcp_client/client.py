@@ -1,7 +1,7 @@
 """Bridge that loads MCP tools as LangChainTools for the agents"""
 
-from __future__ import annotations
 
+from __future__ import annotations
 from config import get_settings, Settings
 
 async def load_tools() -> list:

@@ -6,10 +6,9 @@
 
 from __future__ import annotations
 
-from guardrails import GuardrailViolation
 
 ALLOWED_TOOLS = frozenset(
-    {"search_flights","search_hotles","search_places","get_weather","convert_currency"}
+    {"resolve_location","search_flights","search_hotels","search_places","get_weather","convert_currency"}
 )
 
 def guard_tool_call(name: str, args: dict)-> dict:
