@@ -1,0 +1,29 @@
+#  --- Agent Orchestartion ---
+langgraph>=0.2.60
+langchain>=0.3.0
+langchain-openai>=0.2.0
+
+# --- Model Context Protocal ---
+mcp[cli]>=1.26.0
+langchain-mcp-adapter>=0.1.0
+
+# --- LLM Gateway ---
+litellm>=1.55.0
+
+# --- LLM Provider SDk ---
+openai>=1.55.0
+
+# --- Guardrails / validation ---
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+guardrails-ai>=0.6.0
+nemoguardrails>=0.11.0
+
+# --- Obseravability ---
+langfuse>=3.0.0
+
+# --- UI ---
+gradio>=5.0.0
+
+# --- HTTP for tool integration ---
+httpx>=0.27.0 
