@@ -4,6 +4,7 @@
 from __future__ import annotations
 from src.config import get_settings, Settings
 import functools
+from guardrails.tool_guard import guard_tool_call
 import json
 import asyncio
 from mcp_server import ToolError,providers
@@ -64,6 +65,7 @@ async def load_tools() -> list:
 
 async def call_tool(name:str,**args) -> dict:
     """Invoke a travel tool by name, through MCP or in-process per Settings.use_mcp"""
+    args = guard_tool_call(name,args)
     if get_settings().use_mcp:
         return await _call_via_mcp(name,args)
     return await asyncio.to_thread(functools.partial(_call_inline, name, args))

@@ -12,6 +12,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from graph.state import WanderState
 from llm import get_chat_model
 from schemas import TripRequest
+from src.guardrails import GuardrailViolation
+from guardrails.input_guard import check_input
 
 _PARSE_SYSTEM =(
     "You extract structured trip details from a traveler's request."
@@ -27,14 +29,14 @@ def _latest_user_text(state:WanderState)-> str:
             return msg.get("content", "")
     return ""
 
-def _parse_request(state: WanderState) -> TripRequest:
+def _parse_request(text: str) -> TripRequest:
     model = get_chat_model().with_structured_output(TripRequest)
     return cast(
         TripRequest,
         model.invoke(
             [
                 SystemMessage(content=_PARSE_SYSTEM),
-                HumanMessage(content=_latest_user_text(state)),
+                HumanMessage(content=text),
             ]
         ),
     )
@@ -57,7 +59,11 @@ def _route(state:WanderState) -> str:
 async def supervisor_node(state:WanderState) -> dict:
     update:dict = {}
     if not state.get("request"):
-        update["request"] = _parse_request(state)
+        try:
+            text = cast(str, check_input(_latest_user_text(state)))
+        except GuardrailViolation as ex:
+            return {"rejected": True,"critic_feedback": ex.reason,"next_agent":"done"}
+        update["request"] = _parse_request(text)
         state = cast(WanderState, {**state, **update})
     update["next_agent"] = _route(state)
     return update

@@ -44,3 +44,4 @@ class WanderState(TypedDict,total=False):
     # Routing + Human in the loop
     next_agent:AgentName
     awaiting_confirmation:bool
+    rejected:bool

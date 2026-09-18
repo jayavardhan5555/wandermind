@@ -7,7 +7,7 @@ builds the itinerary, and the critic either loops back for a revision or approve
 
 from __future__ import annotations
 from langgraph.graph import START,END, StateGraph
-
+from guardrails.output_guard import check_output
 from agents.critic import critic_node,route_from_crictic
 from graph.state import WanderState
 from agents.supervisor import supervisor_node,route_from_supervisor
@@ -23,6 +23,12 @@ _SPECIALISTS ={
    "budget":budget_node
 }
 
+def confirm_node(state:WanderState) -> dict:
+    """Final gate after human aporobal"""
+    itinerary = state.get("itinerary")
+    if itinerary is not None:
+        itinerary = check_output(itinerary)
+    return {"itinerary":itinerary,"awaiting_confirmation":False}
 
 def build_graph():
 
@@ -34,6 +40,7 @@ def build_graph():
       graph.add_node(name,node)
    graph.add_node("compose",composer_node)
    graph.add_node("critic",critic_node)
+   graph.add_node("confirm",confirm_node)
 
    graph.add_edge(START,"supervisor")
    graph.add_conditional_edges("supervisor",route_from_supervisor,{
@@ -50,7 +57,8 @@ def build_graph():
    graph.add_edge("compose","critic")
    graph.add_conditional_edges("critic",route_from_crictic,{
         "supervisor":"supervisor",
-        "done":END
+        "done":"confirm"
     })
+   graph.add_edge("confirm",END)
 
-   return graph.compile(checkpointer=MemorySaver())
+   return graph.compile(checkpointer=MemorySaver(),interrupt_before=["confirm"])

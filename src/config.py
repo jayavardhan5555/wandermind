@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     mcp_auth_token:str = Field(default="",alias="WANDERMIND_MCP_AUTH_TOKEN")
     use_mcp:bool= Field(default=False,alias="WANDERMIND_USE_MCP")
 
+    use_nemo:bool = Field(default=False,alias="WANDERMIND_USE_NEMO")
+    use_guardrails_ai:bool = Field(default=False,alias="WANDERMIND_USE_GUARDRAILS_AI")
+
     # -- RUN TIME
     env:str = Field(default="development",alias="WANDERMIND_ENV")
     log_level:str = Field(default="INFO",alias="WANDERMIND_LOG_LEVEL")
