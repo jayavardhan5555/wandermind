@@ -8,7 +8,8 @@ state. They are intentionally narrow so the supervisor can compose them freely
 from __future__ import annotations
 from langchain_core.messages import HumanMessage, SystemMessage
 from llm import get_chat_model
-from mcp_server import ToolError,providers
+from mcp_client.client import call_tool
+from mcp_server import ToolError
 from schemas import (
     Activity,
     FlightOption,
@@ -31,9 +32,9 @@ _COMPOSE_SYSTEM = (
 
 from graph.state import WanderState
 
-def _iata(query:str,kind:str)-> str | None:
+async def _iata(query:str,kind:str)-> str | None:
     try:
-        result = providers.resolve_location(query,kind)
+        result = await call_tool("resolve_location",query=query,kind=kind)
     except ToolError as e:
         print(f"Error resolving {kind} for {query}: {e}")
         return None
@@ -42,20 +43,20 @@ def _iata(query:str,kind:str)-> str | None:
             return loc["iata_code"]
     return None
 
-def flight_node(state:WanderState) -> dict:
+async def flight_node(state:WanderState) -> dict:
     if "request" not in state:
         return {}
     req: TripRequest = state["request"]
     if not (req.origin and req.destination and req.start_date):
         return {"flights": []}
-    origin = _iata(req.origin,"airport") or req.origin.upper()
-    destination = _iata(req.destination,"airport") or req.destination.upper()
+    origin = await _iata(req.origin,"airport") or req.origin.upper()
+    destination = await _iata(req.destination,"airport") or req.destination.upper()
     try:
-        data = providers.search_flights(
-            origin,
-            destination,
-            req.start_date.isoformat(),
-            req.travelers)
+        data = await call_tool("search_flights",
+            origin=origin,
+            destination=destination,
+            depart_date=req.start_date.isoformat(),
+            travelers=req.travelers)
     except ToolError as e:
         print(f"Error searching flights: {e}")
         return {"flights": []}
@@ -69,11 +70,12 @@ async def hotel_node(state:WanderState) -> dict:
         return {"hotels": []}
 
     try:
-        data = providers.search_hotels(
-            req.destination,
-            req.start_date.isoformat(),
-            _nights(req),
-            req.travelers,
+        data = await call_tool("search_hotels",
+            city=req.destination,
+            check_in=req.start_date.isoformat(),
+            nights=_nights(req),
+            travelers=req.travelers,
+            max_price_usd=req.budget_usd
         )
     except ToolError as e:
         print(f"Error searching hotels: {e}")
@@ -87,7 +89,7 @@ async def activities_node(state:WanderState) -> dict:
         return {"activities": []}
 
     try:
-        data = providers.search_places(req.destination, req.interests)
+        data = await call_tool("search_places",city=req.destination, interests=req.interests)
     except ToolError as e:
         print(f"Error searching activities: {e}")
         return {"activities": []}
@@ -100,10 +102,10 @@ async def weather_node(state:WanderState) -> dict:
         return {"weather": []}
 
     try:
-        data = providers.get_weather(
-            req.destination,
-            req.start_date.isoformat(),
-            min(_nights(req), 7),
+        data = await call_tool("get_weather",
+            city=req.destination,
+            start_date= req.start_date.isoformat(),
+            days=min(_nights(req), 7),
         )
     except ToolError as e:
         print(f"Error fetching weather: {e}")

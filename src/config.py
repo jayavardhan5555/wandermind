@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     mcp_host:str = Field(default="http://localhost:8000",alias="WANDERMIND_MCP_HOST")
     mcp_port:int = Field(default=8000,alias="WANDERMIND_MCP_PORT")
     mcp_auth_token:str = Field(default="",alias="WANDERMIND_MCP_AUTH_TOKEN")
+    use_mcp:bool= Field(default=False,alias="WANDERMIND_USE_MCP")
 
     # -- RUN TIME
     env:str = Field(default="development",alias="WANDERMIND_ENV")
