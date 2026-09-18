@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from tkinter import N
 from pydantic import BaseModel,Field
-from typing import Literal
+from typing import Literal, TypeAlias
 
 class LocationMatch(BaseModel):
     name:str
@@ -76,7 +76,7 @@ class Itinerary(BaseModel):
     budget: BudgetSummary | None = None
     disclaimers:list[str]= Field(default_factory=list)
 
-class AgentName: Literal[
+AgentName: TypeAlias = Literal[
     "flight",
     "hotel",
     "activities",

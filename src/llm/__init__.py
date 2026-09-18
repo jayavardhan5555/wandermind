@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from functools import lru_cache
+from pydantic import SecretStr
 
 from src.config import get_settings, Settings
 
@@ -40,8 +41,37 @@ def _model_list(settings:Settings) -> list[dict]:
     ]
     return models
 
+def _fallback_model_list(settings:Settings) -> list[dict]:
+    alt = [
+        name
+        for name, present in (
+            ("gemini", settings.gemini_api_key),
+        )
+        if present
+    ]
+    if not alt:
+        return []
+    return [{"primary": alt}, {"heavy": alt}]
+
 @lru_cache
 def get_router():
     """Return a cached , process -wide LiteLLM router singleton"""
     settings = get_settings()
+    import litellm
+    from litellm.files.main import Router
+
+    return Router(
+        model_list=_model_list(settings),
+        fallbacks=_fallback_model_list(settings),
+        num_retries=2,
+        cache_responses=True
+    )
+    
     raise NotImplementedError("LiteLLM router creation is not implemented yet. Please implement the router creation logic here.")
+
+def get_chat_model(*,heavy:bool=False):
+
+    from langchain_litellm import ChatLiteLLMRouter
+    model_name = "heavy" if heavy else "primary"
+    
+    return ChatLiteLLMRouter(router=get_router(),model_name=model_name)

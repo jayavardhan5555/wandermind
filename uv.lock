@@ -1181,6 +1181,20 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-litellm"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "langchain-core" },
+    { name = "litellm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0f/a0/4d8fbfeeba0ea35fa0d0c45e572f11759e8933e84269695311a69a0dc1e7/langchain_litellm-0.7.2.tar.gz", hash = "sha256:45aad91f93a9b7de5ec2cb5037dbe513b86c4eb8ce36c00b66dc7451fd37f3cb", size = 359623, upload-time = "2026-09-16T21:12:47.818Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/16/7b69872b3406e408619f0110cac6e51649e7b26cbfd24e86d9c834c17e5e/langchain_litellm-0.7.2-py3-none-any.whl", hash = "sha256:397ef3c6754294dde8d2929a57059bcc0658f8a4e3602e697727f8de7aeeff23", size = 25443, upload-time = "2026-09-16T21:12:46.708Z" },
+]
+
+[[package]]
 name = "langchain-mcp-adapters"
 version = "0.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3006,6 +3020,7 @@ dependencies = [
     { name = "guardrails-ai" },
     { name = "httpx" },
     { name = "langchain" },
+    { name = "langchain-litellm" },
     { name = "langchain-mcp-adapters" },
     { name = "langchain-openai" },
     { name = "langfuse" },
@@ -3024,6 +3039,7 @@ requires-dist = [
     { name = "guardrails-ai", specifier = ">=0.6.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain", specifier = ">=0.3.0" },
+    { name = "langchain-litellm", specifier = ">=0.2.0" },
     { name = "langchain-mcp-adapters", specifier = ">=0.1.0" },
     { name = "langchain-openai", specifier = ">=0.2.0" },
     { name = "langfuse", specifier = ">=3.0.0" },

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from datetime import date,timedelta
-
+ 
 from src.config import get_settings
 from src.mcp_server import MissingCredentials, ToolError
 from src.schemas import Activity, FlightOption, HotelOption, WeatherDay, LocationMatch
