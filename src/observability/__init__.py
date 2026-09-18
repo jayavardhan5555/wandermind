@@ -1,12 +1,38 @@
 """Langfuse tracing setup"""
 
 from __future__ import annotations
+import os
+from src.config import get_settings,Settings
 
-from src.config import get_settings
+def _export_env(settings:Settings) -> None:
+    os.environ.setdefault("LANGFUSE_PUBLIC_KEY",settings.langfuse_public_key)
+    os.environ.setdefault("LANGFUSE_SECRET_KEY",settings.langfuse_secret_key)
+    os.environ.setdefault("LANGFUSE_HOST",settings.langfuse_host)
+
 
 def get_callback_handler():
 
     settings = get_settings()
     if not settings.langfuse_enabled:
         return None
-    raise NotImplementedError()
+    _export_env(settings)
+    from langfuse.langchain import CallbackHandler
+
+    return CallbackHandler(public_key=settings.langfuse_public_key)
+
+def run_config(thread_id:str,extra_callbacks:list|None=None)->dict:
+    callbacks:list =[]
+    handler  = get_callback_handler()
+    if handler is not None:
+        callbacks.append(handler)
+    if extra_callbacks:
+        callbacks.extend(extra_callbacks)
+    return {"configurable":{"thread_id" : thread_id}, "callbacks": callbacks}
+
+def flush()->None:
+    settings = get_settings()
+    if not settings.langfuse_enabled:
+        return 
+    from langfuse import get_client
+
+    get_client().flush()
