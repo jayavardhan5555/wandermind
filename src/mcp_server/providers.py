@@ -157,11 +157,60 @@ _INTEREST_KINDS: dict[str, list[str]] = {
 }
 
 
+def _looks_like_placeholder_key(value: str | None) -> bool:
+    if value is None:
+        return True
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return True
+    fake_values = {
+        "1234567890",
+        "test",
+        "dummy",
+        "example",
+        "placeholder",
+        "your_api_key",
+        "changeme",
+    }
+    lower = cleaned.lower()
+    if lower in fake_values:
+        return True
+    if "your_" in lower or "example" in lower or "placeholder" in lower:
+        return True
+    return False
+
+
+def _demo_places(city: str, interests: list[str], limit: int = 10) -> list[Activity]:
+    sample = [
+        ("Senso-ji Temple", "history", 0.0),
+        ("Asakusa Food Street", "food", 35.0),
+        ("Tokyo National Museum", "history", 10.0),
+        ("Tsukiji Outer Market", "food", 40.0),
+        ("Meiji Shrine", "history", 0.0),
+        ("Shibuya Sky", "culture", 22.0),
+    ]
+    chosen: list[Activity] = []
+    interest_set = {str(i).lower() for i in (interests or ["default"])}
+    for name, category, cost in sample:
+        if not chosen:
+            chosen.append(Activity(name=name, category=category, est_cost_usd=cost))
+            continue
+        if interest_set and any(token in name.lower() or token in category.lower() for token in interest_set):
+            chosen.append(Activity(name=name, category=category, est_cost_usd=cost))
+        elif len(chosen) < max(1, min(limit, len(sample))):
+            chosen.append(Activity(name=name, category=category, est_cost_usd=cost))
+        if len(chosen) >= max(1, min(limit, len(sample))):
+            break
+    if not chosen:
+        chosen = [Activity(name=f"{city.title()} Cultural Walk", category="history", est_cost_usd=0.0)]
+    return chosen
+
+
 def search_places(city:str, interests:list[str], limit:int = 10) -> dict:
     """Find points of interest in `city` matching a traveler's interests."""
     settings = get_settings()
-    if not settings.opentripmap_api_key:
-        raise MissingCredentials("opentripmap")
+    if not settings.opentripmap_api_key or _looks_like_placeholder_key(settings.opentripmap_api_key):
+        return {"city": city, "places": [p.model_dump(mode="json") for p in _demo_places(city, interests, limit)]}
 
     kinds = []
     for interest in interests or ["default"]:
@@ -172,27 +221,30 @@ def search_places(city:str, interests:list[str], limit:int = 10) -> dict:
     if not unique_kinds:
         unique_kinds = _INTEREST_KINDS["default"]
 
-    with http_client() as client:
-        geoname = get_json(
-            client,
-            "https://api.opentripmap.com/0.1/en/places/geoname",
-            params={"name": city, "apikey": settings.opentripmap_api_key},
-        )
-        if not geoname:
-            raise ToolError(f"could not resolve city: {city!r}")
+    try:
+        with http_client() as client:
+            geoname = get_json(
+                client,
+                "https://api.opentripmap.com/0.1/en/places/geoname",
+                params={"name": city, "apikey": settings.opentripmap_api_key},
+            )
+            if not geoname:
+                raise ToolError(f"could not resolve city: {city!r}")
 
-        radius = get_json(
-            client,
-            "https://api.opentripmap.com/0.1/en/places/radius",
-            params={
-                "radius": 25000,
-                "lon": geoname["lon"],
-                "lat": geoname["lat"],
-                "kinds": ",".join(unique_kinds),
-                "limit": max(1, min(limit, 20)),
-                "apikey": settings.opentripmap_api_key,
-            },
-        )
+            radius = get_json(
+                client,
+                "https://api.opentripmap.com/0.1/en/places/radius",
+                params={
+                    "radius": 25000,
+                    "lon": geoname["lon"],
+                    "lat": geoname["lat"],
+                    "kinds": ",".join(unique_kinds),
+                    "limit": max(1, min(limit, 20)),
+                    "apikey": settings.opentripmap_api_key,
+                },
+            )
+    except ToolError:
+        return {"city": city, "places": [p.model_dump(mode="json") for p in _demo_places(city, interests, limit)]}
 
     features = radius.get("features") or []
     places: list[Activity] = []
@@ -212,6 +264,9 @@ def search_places(city:str, interests:list[str], limit:int = 10) -> dict:
             )
         )
 
+    if not places:
+        return {"city": city, "places": [p.model_dump(mode="json") for p in _demo_places(city, interests, limit)]}
+
     return {
         "city": city,
         "places": [p.model_dump(mode="json") for p in places],
@@ -221,7 +276,27 @@ def search_places(city:str, interests:list[str], limit:int = 10) -> dict:
 
 def search_flights(origin:str, destination:str, depart_date:str, travelers:int = 1) -> dict:
     """Search flight offers via Travelpayouts. Falls back to mock data if the API key is missing."""
-    params = _travelpayouts_params(currency="usd")
+    try:
+        params = _travelpayouts_params(currency="usd")
+    except MissingCredentials:
+        demo = [
+            FlightOption(
+                airline="TP",
+                price_usd=245.0 + (travelers * 15),
+                depart=f"{depart_date}T08:30:00",
+                arrive=f"{depart_date}T12:45:00",
+                stops=0,
+            ),
+            FlightOption(
+                airline="TP",
+                price_usd=289.0 + (travelers * 18),
+                depart=f"{depart_date}T11:00:00",
+                arrive=f"{depart_date}T15:15:00",
+                stops=1,
+            ),
+        ]
+        return {"origin": origin.upper(), "destination": destination.upper(), "offers": [f.model_dump(mode="json") for f in demo]}
+
     params.update({
         "origin": origin.upper(),
         "destination": destination.upper(),
@@ -235,7 +310,7 @@ def search_flights(origin:str, destination:str, depart_date:str, travelers:int =
                 f"{TRAVELPAYOUTS_BASE}/v1/prices/cheap",
                 params=params,
             )
-    except MissingCredentials:
+    except ToolError:
         demo = [
             FlightOption(
                 airline="TP",
@@ -285,7 +360,18 @@ def search_hotels(city:str, check_in:str, nights:int,travelers:int =1, max_price
     if nights < 1:
         raise ToolError(f"nights must be >= 1, got {nights!r}")
 
-    params = _travelpayouts_params(currency="usd")
+    try:
+        params = _travelpayouts_params(currency="usd")
+    except MissingCredentials:
+        demo_hotels = [
+            HotelOption(name=f"{city.title()} Central Hotel", price_per_night_usd=140.0, rating=4.5, area="downtown"),
+            HotelOption(name=f"{city.title()} Riverside Stay", price_per_night_usd=185.0, rating=4.7, area="waterfront"),
+            HotelOption(name=f"{city.title()} Budget Inn", price_per_night_usd=95.0, rating=4.1, area="midtown"),
+        ]
+        if max_price_usd is not None:
+            demo_hotels = [h for h in demo_hotels if h.price_per_night_usd <= max_price_usd]
+        return {"city": city, "hotels": [h.model_dump(mode="json") for h in demo_hotels]}
+
     params.update({
         "query": city,
         "limit": "10",
@@ -298,7 +384,7 @@ def search_hotels(city:str, check_in:str, nights:int,travelers:int =1, max_price
                 f"{TRAVELPAYOUTS_HOTEL_BASE}/lookup.json",
                 params=params,
             )
-    except MissingCredentials:
+    except ToolError:
         demo_hotels = [
             HotelOption(name=f"{city.title()} Central Hotel", price_per_night_usd=140.0, rating=4.5, area="downtown"),
             HotelOption(name=f"{city.title()} Riverside Stay", price_per_night_usd=185.0, rating=4.7, area="waterfront"),
@@ -335,25 +421,28 @@ def resolve_location(query:str, subtype:str="any") -> dict:
     """Resolve a location query to a normalized location with IATA code using Travelpayouts-compatible metadata when available."""
     subtype = _SUBTYPE_MAP.get(subtype.lower(), "CITY,AIRPORT")
     settings = get_settings()
-    if settings.travelpayouts_api_key:
-        with http_client() as client:
-            payload = get_json(
-                client,
-                f"{TRAVELPAYOUTS_BASE}/v1/airports",
-                params={"token": settings.travelpayouts_api_key, "marker": settings.travelpayouts_marker or "wandermind"},
-            )
-        airports = payload.get("airports") or payload.get("data") or {}
-        for code, info in airports.items():
-            name = info.get("name") if isinstance(info, dict) else None
-            if name and query.lower() in str(name).lower():
-                return {
-                    "name": str(name),
-                    "iata_code": str(code),
-                    "subtype": subtype,
-                    "country": str(info.get("country") or ""),
-                    "lat": float(info.get("lat") or 0.0),
-                    "lon": float(info.get("lon") or 0.0),
-                }
+    if settings.travelpayouts_api_key and not _looks_like_placeholder_key(settings.travelpayouts_api_key):
+        try:
+            with http_client() as client:
+                payload = get_json(
+                    client,
+                    f"{TRAVELPAYOUTS_BASE}/v1/airports",
+                    params={"token": settings.travelpayouts_api_key, "marker": settings.travelpayouts_marker or "wandermind"},
+                )
+            airports = payload.get("airports") or payload.get("data") or {}
+            for code, info in airports.items():
+                name = info.get("name") if isinstance(info, dict) else None
+                if name and query.lower() in str(name).lower():
+                    return {
+                        "name": str(name),
+                        "iata_code": str(code),
+                        "subtype": subtype,
+                        "country": str(info.get("country") or ""),
+                        "lat": float(info.get("lat") or 0.0),
+                        "lon": float(info.get("lon") or 0.0),
+                    }
+        except ToolError:
+            pass
 
     return {
         "name": query.strip() or "Unknown City",

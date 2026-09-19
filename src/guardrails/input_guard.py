@@ -39,11 +39,13 @@ def _nemo_check(text: str) -> str | GuardrailViolation:
         return GuardrailViolation("input","Input violates NeMo Guardrails.")
     return text
 
-def check_input(user_message: str) -> str | GuardrailViolation:
+def check_input(user_message: str) -> str:
     """Check user input for guardrails violations."""
     text = _rule_based(user_message)
     if isinstance(text, GuardrailViolation):
-        return text
+        raise text
     if get_settings().use_nemo:
         text = _nemo_check(text)
+        if isinstance(text, GuardrailViolation):
+            raise text
     return text

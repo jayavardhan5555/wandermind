@@ -48,21 +48,24 @@ async def plan(message:str,thread_id:str|None):
     """Plan the travel itinerary for the given message"""
     if not(message or "").strip():
         return thread_id,gr.update(value="_Please describe your trip!_"),gr.update(visible=False)
-    
+
     tid = thread_id or str(uuid.uuid4())
     config = run_config(tid)
     try:
         await _get_graph().ainvoke({"messages":[HumanMessage(content=message)]},config=config)
     except Exception as exc:
-        print(f"Graph invocation failed: {exc}")    
+        print(f"Graph invocation failed: {exc}")
+        return tid, gr.update(value=f"**Planning failed:** {exc}"),gr.update(visible=False)
+    finally:
+        flush()
 
-    snapshot = _get_graph().get_state(config=config) 
+    snapshot = _get_graph().get_state(config)
     state = snapshot.values
     if state.get("rejected"):
         reason = state.get("critic_feedback","request blocked by guardrails")
-        return tid, gr.update(value=f"**Rejected**: {reason}"),gr.update(visible=False) 
+        return tid, gr.update(value=f"**Rejected**: {reason}"),gr.update(visible=False)
 
-    awaiting = "confirm"  in (snapshot.next or ())
+    awaiting = "confirm" in (snapshot.next or ())
     return tid, gr.update(value=_render(state.get("itinerary"))),gr.update(visible=awaiting)
     
 async def confirm(thread_id: str | None):

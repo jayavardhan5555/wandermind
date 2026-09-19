@@ -8,7 +8,7 @@ from __future__ import annotations
 from langchain_core.messages import HumanMessage, SystemMessage
 from src.llm import get_chat_model
 from src.graph.state import WanderState
-from pydantic import BaseModel
+from src.schemas import WanderModel
 MAX_REVISIONS = 2
 
 _CRITIC_SYSTEM = (
@@ -18,23 +18,23 @@ _CRITIC_SYSTEM = (
     "You may request revisions up to a maximum of 2 times."
 )
 
-class _Review(BaseModel):
+class _Review(WanderModel):
     approved: bool
-    feedback: str =""
+    feedback: str = ""
 
 async def critic_node(state:WanderState) -> dict:
     revisions = state.get("revisions",0)
     model = get_chat_model(heavy=True).with_structured_output(_Review)
     itinerary = state.get("itinerary")
     if itinerary is None:
-        return {"critic_feedback": "No itinerary is available for review."}
+        return {"critic_feedback": "No itinerary is available for review.", "next_agent": "done"}
     review = _Review.model_validate(model.invoke(
         [
             SystemMessage(content=_CRITIC_SYSTEM),
             HumanMessage(content=itinerary.model_dump_json()),
         ]
     ))
-    if review.approved or revisions < MAX_REVISIONS:
+    if review.approved or revisions >= MAX_REVISIONS:
         return {
             "critic_feedback": review.feedback,
             "awaiting_confirmation": True,

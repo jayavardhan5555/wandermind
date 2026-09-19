@@ -42,28 +42,28 @@ def search_flights(
 @mcp.tool()
 def search_places(
     city: Annotated[str, Field(description="City or location, e.g 'New York")],
-    interest: Annotated[list[str], Field(description="Interest or category, e.g 'museums")],
+    interests: Annotated[list[str], Field(description="Interest or category, e.g 'museums")],
     limit: Annotated[int, Field(description="Maximum number of results",ge=1,le=50)]=10,
 ) -> dict:
     """Search for places of interest in a city"""
     settings:Settings = get_settings()
     try:
-        return providers.search_places(city, interest, limit)
+        return providers.search_places(city, interests, limit)
     except ToolError as exc:
         return {"error":str(exc)}
 
 @mcp.tool()
 def search_hotels(
-    location: Annotated[str, Field(description="City or location, e.g 'New York")],
-    checkin_date: Annotated[str, Field(description="Check-in date in YYYY-MM-DD format")],
+    city: Annotated[str, Field(description="City or location, e.g 'New York")],
+    check_in: Annotated[str, Field(description="Check-in date in YYYY-MM-DD format")],
     nights: Annotated[int, Field(description="Number of nights",ge=1,le=20)]=1,
     travelers: Annotated[int, Field(description="Number of travelers",ge=1,le=20)]=1,
-    max_price: Annotated[float, Field(description="Maximum price per night",ge=0.0)]=0.0,
+    max_price_usd: Annotated[float, Field(description="Maximum price per night",ge=0.0)]=0.0,
 ) -> dict:
     """Search for hotels in a location for given dates"""
     settings:Settings = get_settings()
     try:
-        return providers.search_hotels(location,checkin_date,nights,travelers,max_price)
+        return providers.search_hotels(city, check_in, nights, travelers, max_price_usd)
     except ToolError as exc:
         return {"error":str(exc)}
 

@@ -1,0 +1,18 @@
+﻿Loaded as API: http://127.0.0.1:7860/
+Client.predict() Usage Info
+---------------------------
+Named API endpoints: 2
+
+ - predict(message, api_name="/plan") -> value_7
+    Parameters:
+     - [Textbox] message: str (required)  
+    Returns:
+     - [Markdown] value_7: str 
+
+ - predict(api_name="/confirm") -> value_7
+    Parameters:
+     - None
+    Returns:
+     - [Markdown] value_7: str 
+
+API endpoints: {'named_endpoints': {'/plan': {'parameters': [{'label': 'Plan a 5-day tokyo trip for 2 under $2500, love food & history', 'parameter_name': 'message', 'parameter_has_default': False, 'parameter_default': None, 'type': {'type': 'string'}, 'python_type': {'type': 'str', 'description': ''}, 'component': 'Textbox', 'example_input': 'Hello!!'}], 'returns': [{'label': 'value_7', 'type': {'type': 'string'}, 'python_type': {'type': 'str', 'description': ''}, 'component': 'Markdown'}], 'description': 'Plan the travel itinerary for the given message'}, '/confirm': {'parameters': [], 'returns': [{'label': 'value_7', 'type': {'type': 'string'}, 'python_type': {'type': 'str', 'description': ''}, 'component': 'Markdown'}], 'description': ''}}, 'unnamed_endpoints': {}}

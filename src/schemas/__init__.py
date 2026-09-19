@@ -4,11 +4,59 @@ Keeping these strict means agent outputs are always validated structured data, w
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date
-from pydantic import BaseModel,Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal, TypeAlias
 
-class LocationMatch(BaseModel):
+
+def _to_openai_strict(schema: dict) -> dict:
+    """Make a JSON schema valid for OpenAI structured outputs (strict=True)."""
+    out = deepcopy(schema)
+    _apply_openai_strict(out)
+    return out
+
+
+def _apply_openai_strict(node: dict) -> None:
+    if not isinstance(node, dict):
+        return
+    node.pop("default", None)
+    for key in ("$defs", "definitions"):
+        defs = node.get(key)
+        if isinstance(defs, dict):
+            for value in defs.values():
+                _apply_openai_strict(value)
+    for key in ("anyOf", "oneOf", "allOf"):
+        variants = node.get(key)
+        if isinstance(variants, list):
+            for item in variants:
+                _apply_openai_strict(item)
+    items = node.get("items")
+    if isinstance(items, dict):
+        _apply_openai_strict(items)
+    elif isinstance(items, list):
+        for item in items:
+            _apply_openai_strict(item)
+    properties = node.get("properties")
+    if isinstance(properties, dict):
+        node["type"] = "object"
+        node["additionalProperties"] = False
+        node["required"] = list(properties.keys())
+        for prop in properties.values():
+            _apply_openai_strict(prop)
+
+
+class WanderModel(BaseModel):
+    """Pydantic base whose JSON schema satisfies OpenAI strict structured output."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs):
+        return _to_openai_strict(super().model_json_schema(*args, **kwargs))
+
+
+class LocationMatch(WanderModel):
     name:str
     iata_code:str | None = None
     subtype:str | None = None
@@ -16,7 +64,7 @@ class LocationMatch(BaseModel):
     lat:float | None = None
     lon:float | None = None
 
-class TripRequest(BaseModel):
+class TripRequest(WanderModel):
     """Normalized user request produced by the supervisor after intent parsing"""
 
     destination: str
@@ -28,46 +76,46 @@ class TripRequest(BaseModel):
     interests: list[str] = Field(default_factory=list)
     notes: str | None = None
 
-class FlightOption(BaseModel):
+class FlightOption(WanderModel):
     airline:str
     price_usd:float = Field(ge=0)
     depart:str
     arrive:str
     stops:int = Field(default=0,ge=0)
 
-class HotelOption(BaseModel):
+class HotelOption(WanderModel):
     name:str
     price_per_night_usd: float = Field(ge=0)
     rating:float | None = Field(default=None,ge=0,le=5)
     area:str | None = None
 
-class Activity(BaseModel):
+class Activity(WanderModel):
     name:str
     category:str | None = None
     est_cost_usd:float = Field(default=0,ge=0)
     lat:float | None = None
     lon:float | None = None
 
-class WeatherDay(BaseModel):
+class WeatherDay(WanderModel):
     day:date
     summary:str
     high_c:float | None = None
     low_c:float | None = None
 
-class BudgetSummary(BaseModel):
+class BudgetSummary(WanderModel):
     flights_usd:float=Field(default=0,ge=0)
     lodging_usd:float=Field(default=0,ge=0)
     activities_usd:float=Field(default=0,ge=0)
     total_usd:float=Field(default=0,ge=0)
     within_budget:bool = True
 
-class ItineraryDay(BaseModel):
+class ItineraryDay(WanderModel):
     day:date | None = None
     title:str
     items: list[str] = Field(default_factory=list)
     est_cost_usd:float = Field(default=0,ge=0)
 
-class Itinerary(BaseModel):
+class Itinerary(WanderModel):
     """The final validated output returned to the user"""
     destination:str
     summary:str
@@ -85,19 +133,20 @@ AgentName: TypeAlias = Literal[
     "done"
 ]
 
-class RouteDecision(BaseModel):
+class RouteDecision(WanderModel):
     """structured supervisor output : the next hop and on the first turn"""
 
     next_agent: AgentName
     request: TripRequest
     reason: str | None = None
 
-class CriticVerdict(BaseModel):
+class CriticVerdict(WanderModel):
     approved: bool
     score: float | None = Field(default=None,ge=0,le=10)
     feedback:str | None = None
 
 __all__ =[
+    "WanderModel",
     "LocationMatch",
     "TripRequest",
     "FlightOption",
