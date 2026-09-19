@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     langfuse_host:str = Field(default="https://cloud.langfuse.com",alias="LANGFUSE_HOST")
 
     # -- MCP Server
-    mcp_host:str = Field(default="http://localhost:8000",alias="WANDERMIND_MCP_HOST")
+    mcp_host:str = Field(default="localhost",alias="WANDERMIND_MCP_HOST")
     mcp_port:int = Field(default=8000,alias="WANDERMIND_MCP_PORT")
     mcp_auth_token:str = Field(default="",alias="WANDERMIND_MCP_AUTH_TOKEN")
     use_mcp:bool= Field(default=False,alias="WANDERMIND_USE_MCP")

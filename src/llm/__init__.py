@@ -55,19 +55,16 @@ def _fallback_model_list(settings:Settings) -> list[dict]:
 
 @lru_cache
 def get_router():
-    """Return a cached , process -wide LiteLLM router singleton"""
+    """Return a cached , process -wide LiteLLM router singleton."""
     settings = get_settings()
-    import litellm
     from litellm import Router
 
     return Router(
         model_list=_model_list(settings),
         fallbacks=_fallback_model_list(settings),
         num_retries=2,
-        cache_responses=True
+        cache_responses=True,
     )
-    
-    raise NotImplementedError("LiteLLM router creation is not implemented yet. Please implement the router creation logic here.")
 
 def get_chat_model(*,heavy:bool=False):
 
