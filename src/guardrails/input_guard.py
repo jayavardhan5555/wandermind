@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 import re
-from config import get_settings
+from src.config import get_settings
 from src.guardrails import GuardrailViolation
 MAX_INPUT_CHARS = 400
 

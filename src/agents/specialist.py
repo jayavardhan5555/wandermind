@@ -7,10 +7,10 @@ state. They are intentionally narrow so the supervisor can compose them freely
 
 from __future__ import annotations
 from langchain_core.messages import HumanMessage, SystemMessage
-from llm import get_chat_model
-from mcp_client.client import call_tool
-from mcp_server import ToolError
-from schemas import (
+from src.llm import get_chat_model
+from src.mcp_client.client import call_tool
+from src.mcp_server import ToolError
+from src.schemas import (
     Activity,
     FlightOption,
     HotelOption,
@@ -30,7 +30,7 @@ _COMPOSE_SYSTEM = (
     "The final output should be a structured Itinerary object, including a summary, daily breakdown, and budget summary.    "
     "If you cannot produce a valid itinerary, return an empty Itinerary object.")
 
-from graph.state import WanderState
+from src.graph.state import WanderState
 
 async def _iata(query:str,kind:str)-> str | None:
     try:
@@ -141,18 +141,25 @@ async def budget_node(state:WanderState) -> dict:
 
 def _compose_context(state:WanderState) -> str:
     """Produce a JSON string of the current state for the composer prompt"""
-    def dump(objs)-> list:
-        return [o.model_dump_json() for o in objs] if objs else []
+    import json
+    def _ser(obj):
+        if obj is None:
+            return None
+        if isinstance(obj, list):
+            return [_ser(o) for o in obj]
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump(mode="json")
+        return obj
     context = {
-        "request": state.get("request"),
-        "flights": state.get("flights"),
-        "hotels": state.get("hotels"),
-        "activities": state.get("activities"),
-        "weather": state.get("weather"),
-        "budget": state.get("budget"),
+        "request": _ser(state.get("request")),
+        "flights": _ser(state.get("flights")),
+        "hotels": _ser(state.get("hotels")),
+        "activities": _ser(state.get("activities")),
+        "weather": _ser(state.get("weather")),
+        "budget": _ser(state.get("budget")),
         "revision_feedback": state.get("critic_feedback")
     }
-    return Itinerary.model_validate(context).model_dump_json()
+    return json.dumps(context, default=str)
 
 async def composer_node(state:WanderState) -> dict:
     model = get_chat_model(heavy=True).with_structured_output(Itinerary)

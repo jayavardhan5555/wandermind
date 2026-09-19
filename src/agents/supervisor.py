@@ -9,11 +9,11 @@ from __future__ import annotations
 from typing import cast
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from graph.state import WanderState
-from llm import get_chat_model
-from schemas import TripRequest
+from src.graph.state import WanderState
+from src.llm import get_chat_model
+from src.schemas import TripRequest
 from src.guardrails import GuardrailViolation
-from guardrails.input_guard import check_input
+from src.guardrails.input_guard import check_input
 
 _PARSE_SYSTEM =(
     "You extract structured trip details from a traveler's request."
@@ -47,7 +47,7 @@ def _route(state:WanderState) -> str:
     if "hotels" not in state:
         return "hotel" 
     if "activities" not in state:
-        return "activity"
+        return "activities"
     if "weather" not in state:
         return "weather"
     if "budget" not in state:

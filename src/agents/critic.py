@@ -6,8 +6,8 @@ for a bounded number of revisions.
 
 from __future__ import annotations
 from langchain_core.messages import HumanMessage, SystemMessage
-from llm import get_chat_model
-from graph.state import WanderState
+from src.llm import get_chat_model
+from src.graph.state import WanderState
 from pydantic import BaseModel
 MAX_REVISIONS = 2
 
@@ -36,7 +36,7 @@ async def critic_node(state:WanderState) -> dict:
     ))
     if review.approved or revisions < MAX_REVISIONS:
         return {
-            "crictic_feedback": review.feedback,
+            "critic_feedback": review.feedback,
             "awaiting_confirmation": True,
             "next_agent":"done"
         }

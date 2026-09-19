@@ -58,7 +58,7 @@ def get_router():
     """Return a cached , process -wide LiteLLM router singleton"""
     settings = get_settings()
     import litellm
-    from litellm.files.main import Router
+    from litellm import Router
 
     return Router(
         model_list=_model_list(settings),

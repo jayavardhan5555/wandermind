@@ -12,7 +12,7 @@ from typing import Annotated, TypedDict
 
 from langgraph.graph.message import add_messages
 
-from schemas import (
+from src.schemas import (
     Activity,
     AgentName,
     CriticVerdict,
