@@ -7,6 +7,23 @@ from pydantic import SecretStr
 from src.config import get_settings, Settings
 
 def _model_list(settings:Settings) -> list[dict]:
+    if not settings.openai_api_key and settings.gemini_api_key:
+        return [
+            {
+                "model_name": "primary",
+                "litellm_params": {
+                    "model": "gemini/gemini-2.0-flash",
+                    "api_key": settings.gemini_api_key,
+                },
+            },
+            {
+                "model_name": "heavy",
+                "litellm_params": {
+                    "model": "gemini/gemini-2.0-flash",
+                    "api_key": settings.gemini_api_key,
+                },
+            },
+        ]
 
     models:list[dict] = [
         {

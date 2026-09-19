@@ -4,9 +4,11 @@ from __future__ import annotations
 from src.config import get_settings
 import threading
 import uuid
+from datetime import date
 from langchain_core.messages import HumanMessage
 from src.graph.builder import build_graph
 from src.observability import flush,run_config
+from src.schemas import BudgetSummary, Itinerary, ItineraryDay
 
 import gradio as gr
 
@@ -43,6 +45,55 @@ def _render(itinerrary) -> str:
         for d in itinerrary.disclaimers:
             lines.append(f"*Disclaimer: {d}*")
     return "\n".join(lines)
+
+def _demo_itinerary() -> Itinerary:
+    return Itinerary(
+        destination="Tokyo",
+        summary="A compact five-day Tokyo sampler focused on food, history, and neighborhoods.",
+        days=[
+            ItineraryDay(
+                day=date(2026, 4, 10),
+                title="Asakusa and Ueno",
+                items=["Senso-ji at sunrise", "Street-food crawl near Nakamise-dori", "Tokyo National Museum"],
+                est_cost_usd=55,
+            ),
+            ItineraryDay(
+                day=date(2026, 4, 11),
+                title="Modern Tokyo",
+                items=["Meiji Shrine", "Harajuku lunch", "Shibuya Sky at sunset"],
+                est_cost_usd=70,
+            ),
+            ItineraryDay(
+                day=date(2026, 4, 12),
+                title="Markets and neighborhoods",
+                items=["Tsukiji Outer Market breakfast", "Ginza walk", "Small izakaya dinner"],
+                est_cost_usd=85,
+            ),
+            ItineraryDay(
+                day=date(2026, 4, 13),
+                title="A slower local day",
+                items=["Yanaka neighborhood walk", "Tea and wagashi tasting", "Kappabashi kitchen street"],
+                est_cost_usd=45,
+            ),
+            ItineraryDay(
+                day=date(2026, 4, 14),
+                title="Farewell Tokyo",
+                items=["Coffee in Daikanyama", "TeamLab visit", "Last ramen dinner"],
+                est_cost_usd=65,
+            ),
+        ],
+        budget=BudgetSummary(
+            flights_usd=0,
+            lodging_usd=0,
+            activities_usd=320,
+            total_usd=320,
+            within_budget=True,
+        ),
+        disclaimers=["This is a static demo itinerary; prices and availability are illustrative."],
+    )
+
+def demo():
+    return gr.update(value=_render(_demo_itinerary())), gr.update(visible=False)
 
 async def plan(message:str,thread_id:str|None):
     """Plan the travel itinerary for the given message"""
@@ -92,10 +143,12 @@ def build_ui()->gr.Blocks:
                 scale=4
             )
             send = gr.Button("Plan",variant="primary",scale=1)
+            demo_btn = gr.Button("Try demo",scale=1)
         itinerary = gr.Markdown("_Your Itinernary will appare here_")
         confirm_btn = gr.Button("Confirm & Finalize",visible=False,variant="primary")
 
         send.click(plan,inputs=[msg,thread],outputs=[thread,itinerary,confirm_btn])
+        demo_btn.click(demo,outputs=[itinerary,confirm_btn])
         confirm_btn.click(confirm,inputs=[thread],outputs=[itinerary,confirm_btn])
     return demo
 
